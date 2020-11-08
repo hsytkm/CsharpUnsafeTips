@@ -185,7 +185,7 @@ unsafe {
     // void* pointer
     Unsafe.InitBlock(pointer, 0x00, size);
 
-	// アライメントを考慮しない版
+    // アライメントを考慮しない版
     Unsafe.InitBlockUnaligned(pointer, 0x00, size);
 }
 ```
@@ -203,7 +203,7 @@ unsafe {
     // void* srcPointer / void* destPointer
     Unsafe.CopyBlock(srcPointer, destPointer, (uint)size);
 
-	// アライメントを考慮しない版
+    // アライメントを考慮しない版
     Unsafe.CopyBlockUnaligned(srcPointer, destPointer, (uint)size);
 }
 ```

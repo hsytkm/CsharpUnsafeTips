@@ -1,18 +1,15 @@
-# C# unsafeポインタ TIPS 17連発﻿
-
-
 
 ## 初めに
 
-本稿は [@gushwell](https://qiita.com/gushwell)さんの [C#リフレクションTIPS 55連発](https://qiita.com/gushwell/items/91436bd1871586f6e663) に触発されて作成しました。
+本記事は [@gushwell](https://qiita.com/gushwell)さんの [C#リフレクションTIPS 55連発](https://qiita.com/gushwell/items/91436bd1871586f6e663) に触発されて書きました。
 
- [C#リフレクションTIPS 55連発](https://qiita.com/gushwell/items/91436bd1871586f6e663) では、薄っすらとしか覚えていないリフレクションが網羅的にまとめられており、その便利さのおかげで 余計に リフレクションを覚えられなくなってしまった良記事です。
+ [C#リフレクションTIPS 55連発](https://qiita.com/gushwell/items/91436bd1871586f6e663) は、薄っすらとしか覚えていないリフレクションが網羅的にまとめられており、その便利さのおかげで 余計に リフレクションを覚えられなくなってしまった良記事です:thumbsup_tone1:
 
 
 
 私は業務で画像を扱うことが多く、P/Invoke でメモリを受け渡したり、ポインタ越しにメモリを操作するのですが、その度に過去のコードを探ったり、ぐぐったりしています。
 
-ポインタに関わらず大体のことは ぐぐれば出てくるのですが手間なので、未来の自分のため unsafeポインタ についてまとめました。
+ポインタに関わらず大体のことは ぐぐれば出てくるのですが、手間なので、未来の自分のため unsafeポインタ についてまとめました。
 
 
 
@@ -36,23 +33,24 @@ System.IntPtr と void* は相互に変換できます。
 
 
 
-### 1. Convert IntPtr -> void*
+### 1. Convert IntPtr -> Pointer
 
 ```C#
 unsafe {
+    // IntPtr intPtr
     void* pointer = intPtr.ToPointer();
 }
 ```
 
 
 
-### 2. Convert void* -> IntPtr
+### 2. Convert Pointer -> IntPtr
 
 ```C#
 unsafe {
     // void* pointer
-    IntPtr intPtr1 = new IntPtr(pointer);
-    IntPtr intPtr2 = (IntPtr)pointer;	// どちらも同じ
+    IntPtr intPtr0 = new IntPtr(pointer);
+    IntPtr intPtr1 = (IntPtr)pointer;	// どちらも同じ
 }
 ```
 
@@ -91,10 +89,10 @@ unsafe {
 
 ### 5. Convert Array -> Pointer
 
-配列（マネージドオブジェクト）はヒープ領域で管理されているので、GCの再配置を防ぐため fixed を使う必要があります。
+マネージドオブジェクトはヒープ領域で管理されているので、GCの再配置を防ぐため fixed を使う必要があります。
 
 ```C#
-byte[] array = new byte[16];
+byte[] array = new byte[size];
 unsafe {
     fixed (byte* ptr = array) {
     }
@@ -105,7 +103,7 @@ unsafe {
 
 ## 読み込み
 
-### 6. Read from Pointer (safe)
+### 6. Read from IntPtr
 
 ポインタから値を読み込む。
 
@@ -139,7 +137,7 @@ unsafe {
 
 ## 書き込み
 
-### 8. Write to Pointer (safe)
+### 8. Write to IntPtr
 
 ポインタに値を書き込む。
 
@@ -159,7 +157,7 @@ Marshal.StructureToPtr<MyStruct>(myStruct, intPtr, fDeleteOld: false);
 
 ポインタに値を書き込む。
 
-Write() と Copy() が提供されていますが、参照渡しできる Copy() の方がパフォーマンスが良さそうです。未確認
+Write() と Copy() が提供されていますが、参照渡しできる Copy() の方がパフォーマンスが良さそうです。
 
 ```C#
 unsafe {
@@ -183,10 +181,10 @@ unsafe {
 ```C#
 unsafe {
     // void* pointer
-    Unsafe.InitBlock(pointer, 0x00, size);
+    Unsafe.InitBlock(pointer, 0x00, (uint)size);
 
     // アライメントを考慮しない版
-    Unsafe.InitBlockUnaligned(pointer, 0x00, size);
+    Unsafe.InitBlockUnaligned(pointer, 0x00, (uint)size);
 }
 ```
 
@@ -210,7 +208,7 @@ unsafe {
 
 #### Buffer
 
-書き込み先メモリの使用可能なバイト数を設定する引数があるが、使う場面が分からないので、上の Unsafe.CopyBlock() を使っておけば良さそう。
+Unsafeクラスには存在しない書き込み先メモリの使用可能なバイト数を設定する引数が存在しますが、使う場面が分からないので、上の Unsafe.CopyBlock() を使っておけば良さそうです。
 
 ``` C#
 unsafe {
@@ -221,9 +219,9 @@ unsafe {
 
 
 
-### 12. Copy Pointer -> Pointer (safe)
+### 12. Copy IntPtr -> IntPtr
 
-動作は速いが、マルチプラットフォームで動作しない。
+動作は速いが、マルチプラットフォームで動作しません。
 
 #### RtlMoveMemory() @kernel32.dll 
 
@@ -247,7 +245,7 @@ _ = memcpy(destIntPtr, srcIntPtr, (UIntPtr)length);
 
 
 
-### 13. Copy Pointer -> Array
+### 13. Copy IntPtr -> Array
 
 ```C#
 // unsafe不要
@@ -256,7 +254,7 @@ Marshal.Copy(srcIntPtr, destArray, startIndex: 0, destArray.Length);
 
 
 
-### 14. Copy Array -> Pointer 
+### 14. Copy Array -> IntPtr
 
 ```C#
 // unsafe不要
@@ -278,7 +276,7 @@ AllocCoTaskMem() を使う方が良さげです。
 ```C#
 // unsafe不要
 IntPtr intPtr = Marshal.AllocCoTaskMem(allocSize);
-
+// do something
 Marshal.FreeCoTaskMem(intPtr);
 ```
 
@@ -287,13 +285,13 @@ Marshal.FreeCoTaskMem(intPtr);
 ```C#
 // unsafe不要
 IntPtr intPtr = Marshal.AllocHGlobal(allocSize);
-
+// do something
 Marshal.FreeHGlobal(intPtr);
 ```
 
 
 
-### 16. スタック領域のポインタ取得
+### 16. スタックメモリのポインタ取得
 
 ```C#
 unsafe {
@@ -318,4 +316,6 @@ unsafe {
 ## 終わりに
 
 30連発くらいにはなるかと思っていましたが、遠く及びませんでした…
+
+
 
